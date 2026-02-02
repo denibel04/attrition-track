@@ -1,5 +1,7 @@
 # Employee Attrition Prediction (Streamlit App)
 
+[**Live App**](https://work-satisfaction-tracker.streamlit.app/)
+
 This interactive **Streamlit** web application predicts the **probability of employee attrition** using a **Machine Learning model (XGBoost)**.  
 The goal is to simulate monthly work evaluations and visualize how an employee’s risk of leaving the company evolves over time.
 

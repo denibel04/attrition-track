@@ -9,6 +9,11 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 
+st.set_page_config(
+    page_title="Work Satisfaction Tracker",
+    page_icon="💼",
+)
+
 # Load data
 if "employees_session" not in st.session_state:
     with open("data/employees.json", "r", encoding="utf-8") as f:
@@ -334,7 +339,15 @@ elif st.session_state.page == "create_employee":
             # st.session_state.page = "login"
             # st.rerun()
 
-
+st.markdown(
+    """
+    <hr>
+    <div style="text-align:center; color:gray;">
+        Developed by Jesús Herrera, Denisa Belean and Antonio Delgado © 2026
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
     
