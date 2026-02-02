@@ -6,6 +6,7 @@ import pandas as pd
 import xgboost 
 from features import build_input, years_between
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 
 # Load data
@@ -42,8 +43,11 @@ def logout():
 # -------------------------------
 if st.session_state.page == "login":
 
-    st.title("Sign in as...")
-    st.button("➕ Create new employee", on_click=create_employee)
+    st.title("😸 Work Satisfaction Tracker")
+    st.image("img/banner.jpg")
+
+    st.subheader("Sign in as...")
+    st.button("Create new employee", on_click=create_employee, icon=":material/person_add:", type="primary")
 
     cols = st.columns(3)
     for i, emp in enumerate(st.session_state.employees_session):
@@ -70,6 +74,7 @@ if st.session_state.page == "login":
                     key=f"select_{emp['id']}",
                     on_click=select_employee,
                     args=(emp,),
+                    type="primary",
                 )
 
 # -------------------------------
@@ -142,7 +147,7 @@ elif st.session_state.page == "home":
                 format_func=lambda x: WLB[x],
             )
 
-        submitted = st.form_submit_button("Submit")
+        submitted = st.form_submit_button("Submit", type="primary", icon=":material/send:")
 
         if submitted:
             record = {
@@ -158,15 +163,14 @@ elif st.session_state.page == "home":
             }
 
             st.success("Form submitted!")
-            st.write(record)
 
             X = build_input(emp, record)
             y_pred = model.predict(X)
             y_prob = model.predict_proba(X)[0][1]
 
-            st.subheader("Attrition Prediction")
-            st.write(f"y_pred: {y_pred[0]}")
-            st.write(f"y_prob: {y_prob}")
+            # st.subheader("Attrition Prediction")
+            # st.write(f"y_pred: {y_pred[0]}")
+            # st.write(f"y_prob: {y_prob}")
 
             emp_scores = [s for s in all_scores if s["id"] == emp["id"]]
             emp_scores.append({
@@ -176,37 +180,49 @@ elif st.session_state.page == "home":
             })
             emp_scores = sorted(emp_scores, key=lambda x: x["date"])
 
-            dates = [s["date"] for s in emp_scores]
-            scores = [s["score"] for s in emp_scores]
-
-            fig, ax = plt.subplots(figsize=(6,4))
+            dates = [datetime.strptime(s["date"], "%Y-%m-%d") for s in emp_scores]
+            scores = [1 - s["score"] for s in emp_scores]  
+            scores_pct = [v*100 for v in scores]
 
             if len(emp_scores) == 1:
-                # Solo un punto: mostramos una barra y el valor encima
-                ax.bar(dates, scores, color='skyblue')
-                for i, v in enumerate(scores):
-                    ax.text(i, v + 0.02, f"{v*100:.1f}%", ha='center', fontweight='bold')
+                st.metric(
+                label="Work Satisfaction",
+                value=f"{scores_pct[0]:.1f}%",
+                delta=None 
+                )
+
             else:
-                # Varias fechas: línea conectando los puntos
-                ax.plot(dates, scores, marker='o', linestyle='-', color='blue')
-                for i, v in enumerate(scores):
-                    ax.text(i, v + 0.02, f"{v*100:.1f}%", ha='center', fontweight='bold')
+                fig, ax = plt.subplots(figsize=(6,4))
+                
+                ax.plot(dates, scores_pct, marker='o', linestyle='--', color='#8070adff') 
+                for i, v in enumerate(scores_pct):
+                    ax.text(dates[i], v + 4, f"{v:.1f}%", ha='center') 
 
-            ax.set_title(f"Attrition Probability Over Time: {emp['FirstName']} {emp['LastName']}")
-            ax.set_xlabel("Date")
-            ax.set_ylabel("Attrition Probability")
-            ax.set_ylim(0, 1)
-            plt.xticks(rotation=45)
-            plt.tight_layout()
-            st.pyplot(fig)
+                # Format x-axis to show only one label per month
+                ax.xaxis.set_major_locator(mdates.MonthLocator())
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%B %Y'))
+
+                # Remove y-axis ticks
+                ax.set_yticks([])
+
+                ax.set_title("Work Satisfaction Over Time")
+                ax.set_ylabel("Work Satisfaction (%)")
+                ax.set_ylim(0, 100)
+                plt.xticks(rotation=45)
+                plt.tight_layout()
+                st.pyplot(fig)
 
 
-    st.button("Log out", on_click=logout)
+
+    st.button("Log out", on_click=logout, type="primary", icon=":material/logout:")
 
 # -------------------------------
 # Create employee page
 # -------------------------------
 elif st.session_state.page == "create_employee":
+
+    st.button("Go back", on_click=logout, type="primary", icon=":material/arrow_back_ios:")
+
     st.title("Create new employee")
 
     EDUCATION_OPTIONS = {
@@ -242,9 +258,8 @@ elif st.session_state.page == "create_employee":
             )
 
         with col2:
-            monthly_income = st.number_input("Monthly Salary", min_value=0)
+           
             num_companies = st.number_input("Number of companies worked", min_value=0)
-            percent_hike = st.number_input("Percent salary hike", min_value=0)
 
             contract_start = st.date_input("Contract start date")
             role_start = st.date_input("Current role start date")
@@ -267,8 +282,24 @@ elif st.session_state.page == "create_employee":
                     "Human Resources",
                 ],
             )
+        
+        monthly_income = st.slider(
+            "Monthly Salary",
+            min_value=1000,
+            max_value=20000,
+            value=7500,
+            step=100
+        )
 
-        submitted = st.form_submit_button("Create employee")
+        percent_hike = st.slider(
+            "Percent Salary Hike",
+            min_value=0,
+            max_value=100,
+            value=15,
+            step=1
+        )
+
+        submitted = st.form_submit_button("Create employee", type="primary")
 
     if submitted:
         if not first_name.strip() or not last_name.strip() or not home_address.strip():
@@ -300,8 +331,8 @@ elif st.session_state.page == "create_employee":
             }
             st.session_state.employees_session.append(new_employee)
             st.success("Employee created successfully 🎉")
-            st.session_state.page = "login"
-            st.rerun()
+            # st.session_state.page = "login"
+            # st.rerun()
 
 
 
