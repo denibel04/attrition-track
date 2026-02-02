@@ -4,10 +4,13 @@ import joblib
 from datetime import date, datetime
 import pandas as pd
 import xgboost 
+from features import build_input
+
 
 # Load data
-with open("data/employees.json", "r", encoding="utf-8") as f:
-    employees = json.load(f)
+if "employees_session" not in st.session_state:
+    with open("data/employees.json", "r", encoding="utf-8") as f:
+        st.session_state.employees_session = json.load(f)
 
 # Load model
 model = joblib.load("model/employee_attrition.joblib")
@@ -23,6 +26,9 @@ def select_employee(emp):
     st.session_state.selected_employee = emp
     st.session_state.page = "home"
 
+def create_employee():
+    st.session_state.page = "create_employee"
+
 def logout():
     st.session_state.selected_employee = None
     st.session_state.page = "login"
@@ -31,9 +37,12 @@ def logout():
 # Login page
 # -------------------------------
 if st.session_state.page == "login":
+
     st.title("Sign in as...")
+    st.button("➕ Create new employee", on_click=create_employee)
+
     cols = st.columns(3)
-    for i, emp in enumerate(employees):
+    for i, emp in enumerate(st.session_state.employees_session):
         col = cols[i % 3]
         with col:
             with st.container(border=True, horizontal_alignment="center"):
@@ -63,6 +72,7 @@ if st.session_state.page == "login":
 # Home page
 # -------------------------------
 elif st.session_state.page == "home":
+
     emp = st.session_state.selected_employee
     avatar_url = (
         f"https://ui-avatars.com/api/?name="
@@ -78,6 +88,7 @@ elif st.session_state.page == "home":
     PERFORMANCE = {1: "Low", 2: "Good", 3: "Excellent", 4: "Outstanding"}
     WLB = {1: "Bad", 2: "Good", 3: "Better", 4: "Best"}
     OVERTIME = {0: "No", 1: "Yes"}
+    BUSINESS_TRAVEL_OPTIONS = {0: "No Travel", 1: "Rarely", 2: "Frequently"}
 
     with st.form("daily_form"):
         st.subheader("Workday evaluation")
@@ -101,6 +112,11 @@ elif st.session_state.page == "home":
                 "Job Satisfaction",
                 options=list(JOB_SAT.keys()),
                 format_func=lambda x: JOB_SAT[x],
+            )
+            business_travel = st.selectbox(
+                "Business Travel",
+                options=list(BUSINESS_TRAVEL_OPTIONS.keys()),
+                format_func=lambda x: BUSINESS_TRAVEL_OPTIONS[x]
             )
 
         with col2:
@@ -134,100 +150,128 @@ elif st.session_state.page == "home":
                 "OverTime": overtime,
                 "PerformanceRating": performance,
                 "WorkLifeBalance": wlb,
+                "BusinessTravel": business_travel
             }
 
             st.success("Form submitted!")
             st.write(record)
 
+            X = build_input(emp, record)
+            y_pred = model.predict(X)
+            y_prob = model.predict_proba(X)[0][1]
 
-    FEATURE_COLUMNS = [
-        "Age", "BusinessTravel", "DistanceFromHome", "Education",
-        "EnvironmentSatisfaction", "Gender", "JobInvolvement", "JobLevel",
-        "JobSatisfaction", "MonthlyIncome", "NumCompaniesWorked", "OverTime",
-        "PercentSalaryHike", "PerformanceRating", "RelationshipSatisfaction",
-        "TotalWorkingYears", "TrainingTimesLastYear", "WorkLifeBalance",
-        "YearsAtCompany", "YearsInCurrentRole", "YearsSinceLastPromotion",
-        "YearsWithCurrManager",
-        "Department_Research & Development", "Department_Sales",
-        "EducationField_Life Sciences", "EducationField_Marketing",
-        "EducationField_Medical", "EducationField_Other",
-        "EducationField_Technical Degree",
-        "JobRole_Human Resources", "JobRole_Laboratory Technician",
-        "JobRole_Manager", "JobRole_Manufacturing Director",
-        "JobRole_Research Director", "JobRole_Research Scientist",
-        "JobRole_Sales Executive", "JobRole_Sales Representative",
-        "MaritalStatus_Married", "MaritalStatus_Single"
-    ]
+            st.subheader("Attrition Prediction")
+            st.write(f"y_pred: {y_pred[0]}")
+            st.write(f"y_prob: {y_prob}")
+
+    st.button("Log out", on_click=logout)
+
+elif st.session_state.page == "create_employee":
+    st.title("Create new employee")
+
+    EDUCATION_OPTIONS = {
+    1: "Below College",
+    2: "College",
+    3: "Bachelor",
+    4: "Master",
+    5: "Doctor"
+    }
+
+    JOB_LEVELS = {1: "Entry", 2: "Low", 3: "Medium", 4: "High", 5: "Top"}
+
+    with st.form("create_employee_form"):
+        col1, col2 = st.columns(2)
+
+        with col1:
+            first_name = st.text_input("First name")
+            last_name = st.text_input("Last name")
+            birth_date = st.date_input("Birth date")
+            gender = st.selectbox("Gender", options=[0, 1], format_func=lambda x: "Female" if x == 0 else "Male")
+            marital_status = st.selectbox("Marital status", ["Single", "Married", "Divorced"])
+            home_address = st.text_input("Home address")
+
+            education = st.selectbox(
+                "Education",
+                options=list(EDUCATION_OPTIONS.keys()),
+                format_func=lambda x: EDUCATION_OPTIONS[x]
+            )
+            business_travel = st.selectbox("Business travel", [0, 1, 2])
+            job_level = st.selectbox(
+                "Job level",
+                options=list(JOB_LEVELS.keys()),
+                format_func=lambda x: JOB_LEVELS[x]
+            )
+
+        with col2:
+            monthly_income = st.number_input("Monthly Salary", min_value=0)
+            num_companies = st.number_input("Number of companies worked", min_value=0)
+            percent_hike = st.number_input("Percent salary hike", min_value=0)
+
+            contract_start = st.date_input("Contract start date")
+            role_start = st.date_input("Current role start date")
+            last_promo = st.date_input("Last promotion date")
+            years_manager = st.number_input("Years with current manager", min_value=0)
+
+            department = st.selectbox("Department", ["Research & Development", "Sales", "Human Resources"])
+            education_field = st.selectbox(
+                "Education field",
+                ["Life Sciences", "Marketing", "Medical", "Other", "Technical Degree"]
+            )
+            job_role = st.selectbox(
+                "Job role",
+                [
+                    "Research Scientist",
+                    "Laboratory Technician",
+                    "Sales Executive",
+                    "Sales Representative",
+                    "Manager",
+                    "Human Resources",
+                ],
+            )
+
+        submitted = st.form_submit_button("Create employee")
+
+    if submitted:
+        if not first_name.strip() or not last_name.strip() or not home_address.strip():
+            st.error("Please fill in First name, Last name, and Home address.")
+        else:
+            new_id = max(emp["id"] for emp in st.session_state.employees_session) + 1
+
+            new_employee = {
+                "id": new_id,
+                "FirstName": first_name,
+                "LastName": last_name,
+                "BirthDate": birth_date.isoformat(),
+                "Gender": gender,
+                "MaritalStatus": marital_status,
+                "HomeAddress": home_address,
+                "Education": education,
+                "BusinessTravel": business_travel,
+                "JobLevel": job_level,
+                "MonthlyIncome": monthly_income,
+                "NumCompaniesWorked": num_companies,
+                "PercentSalaryHike": percent_hike,
+                "TotalWorkingYears": (date.today() - contract_start).days // 365,
+                "ContractStartDate": contract_start.isoformat(),
+                "CurrentRoleStartDate": role_start.isoformat(),
+                "LastPromotionDate": last_promo.isoformat(),
+                "YearsWithCurrManager": years_manager,
+                "Department": department,
+                "EducationField": education_field,
+                "JobRole": job_role,
+            }
+            st.session_state.employees_session.append(new_employee)
+            st.success("Employee created successfully 🎉")
+            st.session_state.page = "login"
+            st.rerun()
+
+
+
 
     
 
-    def years_between(d):
-        return (date.today() - d).days // 365
 
-    def parse(d): 
-        return datetime.strptime(d, "%Y-%m-%d").date()
 
-    def build_input(emp, daily):
-        age = years_between(parse(emp["BirthDate"]))
-        years_at_company = years_between(parse(emp["ContractStartDate"]))
-        years_in_role = years_between(parse(emp["CurrentRoleStartDate"]))
-        years_since_promo = years_between(parse(emp["LastPromotionDate"]))
 
-        data = {
-            "Age": age,
-            "BusinessTravel": emp["BusinessTravel"],
-            "DistanceFromHome": 10,  # placeholder
-            "Education": emp["Education"],
-            "EnvironmentSatisfaction": daily["EnvironmentSatisfaction"],
-            "Gender": emp["Gender"],
-            "JobInvolvement": daily["JobInvolvement"],
-            "JobLevel": emp["JobLevel"],
-            "JobSatisfaction": daily["JobSatisfaction"],
-            "MonthlyIncome": emp["MonthlyIncome"],
-            "NumCompaniesWorked": emp["NumCompaniesWorked"],
-            "OverTime": daily["OverTime"],
-            "PercentSalaryHike": emp["PercentSalaryHike"],
-            "PerformanceRating": daily["PerformanceRating"],
-            "RelationshipSatisfaction": emp["RelationshipSatisfaction"],
-            "TotalWorkingYears": emp["TotalWorkingYears"],
-            "TrainingTimesLastYear": emp["TrainingTimesLastYear"],
-            "WorkLifeBalance": daily["WorkLifeBalance"],
-            "YearsAtCompany": years_at_company,
-            "YearsInCurrentRole": years_in_role,
-            "YearsSinceLastPromotion": years_since_promo,
-            "YearsWithCurrManager": emp["YearsWithCurrManager"],
 
-            # ---- DUMMIES (drop_first applied) ----
-            "Department_Research & Development": 1 if emp["Department"] == "Research & Development" else 0,
-            "Department_Sales": 1 if emp["Department"] == "Sales" else 0,
 
-            "EducationField_Life Sciences": 1 if emp["EducationField"] == "Life Sciences" else 0,
-            "EducationField_Marketing": 1 if emp["EducationField"] == "Marketing" else 0,
-            "EducationField_Medical": 1 if emp["EducationField"] == "Medical" else 0,
-            "EducationField_Other": 1 if emp["EducationField"] == "Other" else 0,
-            "EducationField_Technical Degree": 1 if emp["EducationField"] == "Technical Degree" else 0,
-
-            "JobRole_Human Resources": 1 if emp["JobRole"] == "Human Resources" else 0,
-            "JobRole_Laboratory Technician": 1 if emp["JobRole"] == "Laboratory Technician" else 0,
-            "JobRole_Manager": 1 if emp["JobRole"] == "Manager" else 0,
-            "JobRole_Manufacturing Director": 1 if emp["JobRole"] == "Manufacturing Director" else 0,
-            "JobRole_Research Director": 1 if emp["JobRole"] == "Research Director" else 0,
-            "JobRole_Research Scientist": 1 if emp["JobRole"] == "Research Scientist" else 0,
-            "JobRole_Sales Executive": 1 if emp["JobRole"] == "Sales Executive" else 0,
-            "JobRole_Sales Representative": 1 if emp["JobRole"] == "Sales Representative" else 0,
-
-            "MaritalStatus_Married": 1 if emp["MaritalStatus"] == "Married" else 0,
-            "MaritalStatus_Single": 1 if emp["MaritalStatus"] == "Single" else 0,
-        }
-
-        return pd.DataFrame([data])[FEATURE_COLUMNS]
-
-    X = build_input(emp, record)
-    y_pred = model.predict(X)
-    y_prob = model.predict_proba(X)[0][1]
-
-    st.subheader("Attrition Prediction")
-    st.write(f"y_pred: {y_pred[0]}")
-    st.write(f"y_prob: {y_prob}")
-
-    st.button("Log out", on_click=logout)
