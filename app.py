@@ -240,13 +240,18 @@ elif st.session_state.page == "create_employee":
 
     JOB_LEVELS = {1: "Entry", 2: "Low", 3: "Medium", 4: "High", 5: "Top"}
 
+    today = date.today()
+    earliest_birth = date(1950, 1, 1)
+    latest_birth = date(today.year - 18, today.month, today.day)
+    latest_contract_start = today
+
     with st.form("create_employee_form"):
         col1, col2 = st.columns(2)
 
         with col1:
             first_name = st.text_input("First name")
             last_name = st.text_input("Last name")
-            birth_date = st.date_input("Birth date")
+            birth_date = st.date_input("Birth date", min_value=earliest_birth, max_value=latest_birth, value=date(1990, 1, 1))
             gender = st.selectbox("Gender", options=[0, 1], format_func=lambda x: "Female" if x == 0 else "Male")
             marital_status = st.selectbox("Marital status", ["Single", "Married", "Divorced"])
             home_address = st.text_input("Home address")
@@ -266,10 +271,10 @@ elif st.session_state.page == "create_employee":
            
             num_companies = st.number_input("Number of companies worked", min_value=0)
 
-            contract_start = st.date_input("Contract start date")
-            role_start = st.date_input("Current role start date")
-            last_promo = st.date_input("Last promotion date")
-            last_manager_date = st.date_input("Last manager date")
+            contract_start = st.date_input("Contract start date", min_value=date(1970, 1, 1), max_value=today)
+            role_start = st.date_input("Current role start date", min_value=date(1970, 1, 1), max_value=today)
+            last_promo = st.date_input("Last promotion date", min_value=date(1970, 1, 1), max_value=today)
+            last_manager_date = st.date_input("Last manager date", min_value=date(1970, 1, 1), max_value=today)
 
             department = st.selectbox("Department", ["Research & Development", "Sales", "Human Resources"])
             education_field = st.selectbox(
