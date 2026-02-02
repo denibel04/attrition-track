@@ -4,13 +4,17 @@ import joblib
 from datetime import date, datetime
 import pandas as pd
 import xgboost 
-from features import build_input
+from features import build_input, years_between
+import matplotlib.pyplot as plt
 
 
 # Load data
 if "employees_session" not in st.session_state:
     with open("data/employees.json", "r", encoding="utf-8") as f:
         st.session_state.employees_session = json.load(f)
+
+with open("data/history.json", "r", encoding="utf-8") as f:
+    all_scores = json.load(f)
 
 # Load model
 model = joblib.load("model/employee_attrition.joblib")
@@ -164,8 +168,44 @@ elif st.session_state.page == "home":
             st.write(f"y_pred: {y_pred[0]}")
             st.write(f"y_prob: {y_prob}")
 
+            emp_scores = [s for s in all_scores if s["id"] == emp["id"]]
+            emp_scores.append({
+                "id": emp["id"],
+                "date": str(date.today()),
+                "score": y_prob
+            })
+            emp_scores = sorted(emp_scores, key=lambda x: x["date"])
+
+            dates = [s["date"] for s in emp_scores]
+            scores = [s["score"] for s in emp_scores]
+
+            fig, ax = plt.subplots(figsize=(6,4))
+
+            if len(emp_scores) == 1:
+                # Solo un punto: mostramos una barra y el valor encima
+                ax.bar(dates, scores, color='skyblue')
+                for i, v in enumerate(scores):
+                    ax.text(i, v + 0.02, f"{v*100:.1f}%", ha='center', fontweight='bold')
+            else:
+                # Varias fechas: línea conectando los puntos
+                ax.plot(dates, scores, marker='o', linestyle='-', color='blue')
+                for i, v in enumerate(scores):
+                    ax.text(i, v + 0.02, f"{v*100:.1f}%", ha='center', fontweight='bold')
+
+            ax.set_title(f"Attrition Probability Over Time: {emp['FirstName']} {emp['LastName']}")
+            ax.set_xlabel("Date")
+            ax.set_ylabel("Attrition Probability")
+            ax.set_ylim(0, 1)
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+            st.pyplot(fig)
+
+
     st.button("Log out", on_click=logout)
 
+# -------------------------------
+# Create employee page
+# -------------------------------
 elif st.session_state.page == "create_employee":
     st.title("Create new employee")
 
@@ -195,7 +235,6 @@ elif st.session_state.page == "create_employee":
                 options=list(EDUCATION_OPTIONS.keys()),
                 format_func=lambda x: EDUCATION_OPTIONS[x]
             )
-            business_travel = st.selectbox("Business travel", [0, 1, 2])
             job_level = st.selectbox(
                 "Job level",
                 options=list(JOB_LEVELS.keys()),
@@ -210,7 +249,7 @@ elif st.session_state.page == "create_employee":
             contract_start = st.date_input("Contract start date")
             role_start = st.date_input("Current role start date")
             last_promo = st.date_input("Last promotion date")
-            years_manager = st.number_input("Years with current manager", min_value=0)
+            last_manager_date = st.date_input("Last manager date")
 
             department = st.selectbox("Department", ["Research & Development", "Sales", "Human Resources"])
             education_field = st.selectbox(
@@ -246,16 +285,15 @@ elif st.session_state.page == "create_employee":
                 "MaritalStatus": marital_status,
                 "HomeAddress": home_address,
                 "Education": education,
-                "BusinessTravel": business_travel,
                 "JobLevel": job_level,
                 "MonthlyIncome": monthly_income,
                 "NumCompaniesWorked": num_companies,
                 "PercentSalaryHike": percent_hike,
-                "TotalWorkingYears": (date.today() - contract_start).days // 365,
+                "TotalWorkingYears": years_between(contract_start),
                 "ContractStartDate": contract_start.isoformat(),
                 "CurrentRoleStartDate": role_start.isoformat(),
                 "LastPromotionDate": last_promo.isoformat(),
-                "YearsWithCurrManager": years_manager,
+                "YearsWithCurrManager": years_between(last_manager_date),
                 "Department": department,
                 "EducationField": education_field,
                 "JobRole": job_role,
