@@ -58,17 +58,5 @@ Create employees with:
 
 Employees are stored in browser temporal memory using **`st.session_state`** to simulate new employees.
 
----
-
-## Machine Learning Model
-
-- Algorithm: **XGBoost**
-- Output: attrition probability via `predict_proba`
-- Features include:
-  - Demographic data
-  - Job-related information
-  - Satisfaction metrics
-  - Years of experience
-  - One-hot encoded categorical variables
-
 Feature engineering is handled in `features.py`.
+
